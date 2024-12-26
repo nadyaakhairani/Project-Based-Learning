@@ -1,4 +1,5 @@
-import { convertToCoreMessages, Message, streamText } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { convertToCoreMessages, type Message, streamText } from "ai";
 import { z } from "zod";
 
 import { geminiProModel } from "@/ai";
@@ -33,189 +34,211 @@ export async function POST(request: Request) {
   );
 
   const result = await streamText({
-    model: geminiProModel,
+    model: openai("gpt-4o"),
+    // system: `\n
+    //     - you help users book flights!
+    //     - keep your responses limited to a sentence.
+    //     - DO NOT output lists.
+    //     - after every tool call, pretend you're showing the result to the user and keep your response limited to a phrase.
+    //     - today's date is ${new Date().toLocaleDateString()}.
+    //     - ask follow up questions to nudge user into the optimal flow
+    //     - ask for any details you don't know, like name of passenger, etc.'
+    //     - C and D are aisle seats, A and F are window seats, B and E are middle seats
+    //     - assume the most popular airports for the origin and destination
+    //     - here's the optimal flow
+    //       - search for flights
+    //       - choose flight
+    //       - select seats
+    //       - create reservation (ask user whether to proceed with payment or change reservation)
+    //       - authorize payment (requires user consent, wait for user to finish payment and let you know when done)
+    //       - display boarding pass (DO NOT display boarding pass without verifying payment)
+    //     '
+    //   `,
+    // system: `\n
+    //   - You assist users with currency exchange services at a money changer!
+    //   - Keep your responses concise and limited to a sentence unless the user asks for detailed information.
+    //   - DO NOT output lists.
+    //   - If you need to call a tool to retrieve exchange rates or other information, pretend you're showing the result to the user and limit your response to a phrase like "Here's the current exchange rate."
+    //   - Today’s date is ${new Date().toLocaleDateString()}.
+    //   - Ask follow-up questions to guide users into an optimal flow (e.g., confirming currency types, transaction amounts, or additional services).
+    //   - Request any missing details you need, such as the currency to exchange, the amount, or the purpose of the query.
+    //   - Assume users may ask about foreign exchange rates, tips for exchanging money, or the location and hours of the money changer.
+    //   - Offer alternatives if specific information is unavailable, such as suggesting they contact the nearest branch.
+    //   - Here’s the optimal flow:
+    //     - Ask for the currency pair and transaction amount (e.g., "What currency do you want to exchange, and how much?")
+    //     - Provide the latest exchange rate or other relevant details.
+    //     - Ask if the user needs additional services like a transaction receipt or advice for exchanging larger amounts.
+    //     - If unable to assist fully, suggest they visit or contact the nearest money changer branch for more help.
+    //     - Ensure responses are user-friendly and maintain professionalism.
+    // `,
     system: `\n
-        - you help users book flights!
-        - keep your responses limited to a sentence.
-        - DO NOT output lists.
-        - after every tool call, pretend you're showing the result to the user and keep your response limited to a phrase.
-        - today's date is ${new Date().toLocaleDateString()}.
-        - ask follow up questions to nudge user into the optimal flow
-        - ask for any details you don't know, like name of passenger, etc.'
-        - C and D are aisle seats, A and F are window seats, B and E are middle seats
-        - assume the most popular airports for the origin and destination
-        - here's the optimal flow
-          - search for flights
-          - choose flight
-          - select seats
-          - create reservation (ask user whether to proceed with payment or change reservation)
-          - authorize payment (requires user consent, wait for user to finish payment and let you know when done)
-          - display boarding pass (DO NOT display boarding pass without verifying payment)
-        '
-      `,
+      - You assist users with currency exchange services at a money changer!
+      - Provide the latest exchange rate or other relevant details.
+      - DO NOT output lists.
+    `,
     messages: coreMessages,
-    tools: {
-      getWeather: {
-        description: "Get the current weather at a location",
-        parameters: z.object({
-          latitude: z.number().describe("Latitude coordinate"),
-          longitude: z.number().describe("Longitude coordinate"),
-        }),
-        execute: async ({ latitude, longitude }) => {
-          const response = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m&hourly=temperature_2m&daily=sunrise,sunset&timezone=auto`,
-          );
+    // tools: {
+    //   getWeather: {
+    //     description: "Get the current weather at a location",
+    //     parameters: z.object({
+    //       latitude: z.number().describe("Latitude coordinate"),
+    //       longitude: z.number().describe("Longitude coordinate"),
+    //     }),
+    //     execute: async ({ latitude, longitude }) => {
+    //       const response = await fetch(
+    //         `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m&hourly=temperature_2m&daily=sunrise,sunset&timezone=auto`,
+    //       );
 
-          const weatherData = await response.json();
-          return weatherData;
-        },
-      },
-      displayFlightStatus: {
-        description: "Display the status of a flight",
-        parameters: z.object({
-          flightNumber: z.string().describe("Flight number"),
-          date: z.string().describe("Date of the flight"),
-        }),
-        execute: async ({ flightNumber, date }) => {
-          const flightStatus = await generateSampleFlightStatus({
-            flightNumber,
-            date,
-          });
+    //       const weatherData = await response.json();
+    //       return weatherData;
+    //     },
+    //   },
+    //   displayFlightStatus: {
+    //     description: "Display the status of a flight",
+    //     parameters: z.object({
+    //       flightNumber: z.string().describe("Flight number"),
+    //       date: z.string().describe("Date of the flight"),
+    //     }),
+    //     execute: async ({ flightNumber, date }) => {
+    //       const flightStatus = await generateSampleFlightStatus({
+    //         flightNumber,
+    //         date,
+    //       });
 
-          return flightStatus;
-        },
-      },
-      searchFlights: {
-        description: "Search for flights based on the given parameters",
-        parameters: z.object({
-          origin: z.string().describe("Origin airport or city"),
-          destination: z.string().describe("Destination airport or city"),
-        }),
-        execute: async ({ origin, destination }) => {
-          const results = await generateSampleFlightSearchResults({
-            origin,
-            destination,
-          });
+    //       return flightStatus;
+    //     },
+    //   },
+    //   searchFlights: {
+    //     description: "Search for flights based on the given parameters",
+    //     parameters: z.object({
+    //       origin: z.string().describe("Origin airport or city"),
+    //       destination: z.string().describe("Destination airport or city"),
+    //     }),
+    //     execute: async ({ origin, destination }) => {
+    //       const results = await generateSampleFlightSearchResults({
+    //         origin,
+    //         destination,
+    //       });
 
-          return results;
-        },
-      },
-      selectSeats: {
-        description: "Select seats for a flight",
-        parameters: z.object({
-          flightNumber: z.string().describe("Flight number"),
-        }),
-        execute: async ({ flightNumber }) => {
-          const seats = await generateSampleSeatSelection({ flightNumber });
-          return seats;
-        },
-      },
-      createReservation: {
-        description: "Display pending reservation details",
-        parameters: z.object({
-          seats: z.string().array().describe("Array of selected seat numbers"),
-          flightNumber: z.string().describe("Flight number"),
-          departure: z.object({
-            cityName: z.string().describe("Name of the departure city"),
-            airportCode: z.string().describe("Code of the departure airport"),
-            timestamp: z.string().describe("ISO 8601 date of departure"),
-            gate: z.string().describe("Departure gate"),
-            terminal: z.string().describe("Departure terminal"),
-          }),
-          arrival: z.object({
-            cityName: z.string().describe("Name of the arrival city"),
-            airportCode: z.string().describe("Code of the arrival airport"),
-            timestamp: z.string().describe("ISO 8601 date of arrival"),
-            gate: z.string().describe("Arrival gate"),
-            terminal: z.string().describe("Arrival terminal"),
-          }),
-          passengerName: z.string().describe("Name of the passenger"),
-        }),
-        execute: async (props) => {
-          const { totalPriceInUSD } = await generateReservationPrice(props);
-          const session = await auth();
+    //       return results;
+    //     },
+    //   },
+    //   selectSeats: {
+    //     description: "Select seats for a flight",
+    //     parameters: z.object({
+    //       flightNumber: z.string().describe("Flight number"),
+    //     }),
+    //     execute: async ({ flightNumber }) => {
+    //       const seats = await generateSampleSeatSelection({ flightNumber });
+    //       return seats;
+    //     },
+    //   },
+    //   createReservation: {
+    //     description: "Display pending reservation details",
+    //     parameters: z.object({
+    //       seats: z.string().array().describe("Array of selected seat numbers"),
+    //       flightNumber: z.string().describe("Flight number"),
+    //       departure: z.object({
+    //         cityName: z.string().describe("Name of the departure city"),
+    //         airportCode: z.string().describe("Code of the departure airport"),
+    //         timestamp: z.string().describe("ISO 8601 date of departure"),
+    //         gate: z.string().describe("Departure gate"),
+    //         terminal: z.string().describe("Departure terminal"),
+    //       }),
+    //       arrival: z.object({
+    //         cityName: z.string().describe("Name of the arrival city"),
+    //         airportCode: z.string().describe("Code of the arrival airport"),
+    //         timestamp: z.string().describe("ISO 8601 date of arrival"),
+    //         gate: z.string().describe("Arrival gate"),
+    //         terminal: z.string().describe("Arrival terminal"),
+    //       }),
+    //       passengerName: z.string().describe("Name of the passenger"),
+    //     }),
+    //     execute: async (props) => {
+    //       const { totalPriceInUSD } = await generateReservationPrice(props);
+    //       const session = await auth();
 
-          const id = generateUUID();
+    //       const id = generateUUID();
 
-          if (session && session.user && session.user.id) {
-            await createReservation({
-              id,
-              userId: session.user.id,
-              details: { ...props, totalPriceInUSD },
-            });
+    //       if (session?.user?.id) {
+    //         await createReservation({
+    //           id,
+    //           userId: session.user.id,
+    //           details: { ...props, totalPriceInUSD },
+    //         });
 
-            return { id, ...props, totalPriceInUSD };
-          } else {
-            return {
-              error: "User is not signed in to perform this action!",
-            };
-          }
-        },
-      },
-      authorizePayment: {
-        description:
-          "User will enter credentials to authorize payment, wait for user to repond when they are done",
-        parameters: z.object({
-          reservationId: z
-            .string()
-            .describe("Unique identifier for the reservation"),
-        }),
-        execute: async ({ reservationId }) => {
-          return { reservationId };
-        },
-      },
-      verifyPayment: {
-        description: "Verify payment status",
-        parameters: z.object({
-          reservationId: z
-            .string()
-            .describe("Unique identifier for the reservation"),
-        }),
-        execute: async ({ reservationId }) => {
-          const reservation = await getReservationById({ id: reservationId });
+    //         return { id, ...props, totalPriceInUSD };
+    //       }
 
-          if (reservation.hasCompletedPayment) {
-            return { hasCompletedPayment: true };
-          } else {
-            return { hasCompletedPayment: false };
-          }
-        },
-      },
-      displayBoardingPass: {
-        description: "Display a boarding pass",
-        parameters: z.object({
-          reservationId: z
-            .string()
-            .describe("Unique identifier for the reservation"),
-          passengerName: z
-            .string()
-            .describe("Name of the passenger, in title case"),
-          flightNumber: z.string().describe("Flight number"),
-          seat: z.string().describe("Seat number"),
-          departure: z.object({
-            cityName: z.string().describe("Name of the departure city"),
-            airportCode: z.string().describe("Code of the departure airport"),
-            airportName: z.string().describe("Name of the departure airport"),
-            timestamp: z.string().describe("ISO 8601 date of departure"),
-            terminal: z.string().describe("Departure terminal"),
-            gate: z.string().describe("Departure gate"),
-          }),
-          arrival: z.object({
-            cityName: z.string().describe("Name of the arrival city"),
-            airportCode: z.string().describe("Code of the arrival airport"),
-            airportName: z.string().describe("Name of the arrival airport"),
-            timestamp: z.string().describe("ISO 8601 date of arrival"),
-            terminal: z.string().describe("Arrival terminal"),
-            gate: z.string().describe("Arrival gate"),
-          }),
-        }),
-        execute: async (boardingPass) => {
-          return boardingPass;
-        },
-      },
-    },
+    //       return {
+    //         error: "User is not signed in to perform this action!",
+    //       };
+    //     },
+    //   },
+    //   authorizePayment: {
+    //     description:
+    //       "User will enter credentials to authorize payment, wait for user to repond when they are done",
+    //     parameters: z.object({
+    //       reservationId: z
+    //         .string()
+    //         .describe("Unique identifier for the reservation"),
+    //     }),
+    //     execute: async ({ reservationId }) => {
+    //       return { reservationId };
+    //     },
+    //   },
+    //   verifyPayment: {
+    //     description: "Verify payment status",
+    //     parameters: z.object({
+    //       reservationId: z
+    //         .string()
+    //         .describe("Unique identifier for the reservation"),
+    //     }),
+    //     execute: async ({ reservationId }) => {
+    //       const reservation = await getReservationById({ id: reservationId });
+
+    //       if (reservation.hasCompletedPayment) {
+    //         return { hasCompletedPayment: true };
+    //       }
+
+    //       return { hasCompletedPayment: false };
+    //     },
+    //   },
+    //   displayBoardingPass: {
+    //     description: "Display a boarding pass",
+    //     parameters: z.object({
+    //       reservationId: z
+    //         .string()
+    //         .describe("Unique identifier for the reservation"),
+    //       passengerName: z
+    //         .string()
+    //         .describe("Name of the passenger, in title case"),
+    //       flightNumber: z.string().describe("Flight number"),
+    //       seat: z.string().describe("Seat number"),
+    //       departure: z.object({
+    //         cityName: z.string().describe("Name of the departure city"),
+    //         airportCode: z.string().describe("Code of the departure airport"),
+    //         airportName: z.string().describe("Name of the departure airport"),
+    //         timestamp: z.string().describe("ISO 8601 date of departure"),
+    //         terminal: z.string().describe("Departure terminal"),
+    //         gate: z.string().describe("Departure gate"),
+    //       }),
+    //       arrival: z.object({
+    //         cityName: z.string().describe("Name of the arrival city"),
+    //         airportCode: z.string().describe("Code of the arrival airport"),
+    //         airportName: z.string().describe("Name of the arrival airport"),
+    //         timestamp: z.string().describe("ISO 8601 date of arrival"),
+    //         terminal: z.string().describe("Arrival terminal"),
+    //         gate: z.string().describe("Arrival gate"),
+    //       }),
+    //     }),
+    //     execute: async (boardingPass) => {
+    //       return boardingPass;
+    //     },
+    //   },
+    // },
     onFinish: async ({ responseMessages }) => {
-      if (session.user && session.user.id) {
+      if (session.user?.id) {
         try {
           await saveChat({
             id,

@@ -1,6 +1,5 @@
 "use client";
 
-import { Attachment, Message } from "ai";
 import { useChat } from "ai/react";
 import { useState } from "react";
 
@@ -9,6 +8,8 @@ import { useScrollToBottom } from "@/components/custom/use-scroll-to-bottom";
 
 import { MultimodalInput } from "./multimodal-input";
 import { Overview } from "./overview";
+
+import type { Attachment, Message } from "ai";
 
 export function Chat({
   id,

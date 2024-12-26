@@ -1,11 +1,12 @@
-import { CoreMessage } from "ai";
 import { notFound } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
 import { Chat as PreviewChat } from "@/components/custom/chat";
 import { getChatById } from "@/db/queries";
-import { Chat } from "@/db/schema";
 import { convertToUIMessages } from "@/lib/utils";
+
+import type { Chat } from "@/db/schema";
+import type { CoreMessage } from "ai";
 
 export default async function Page({ params }: { params: any }) {
   const { id } = params;
